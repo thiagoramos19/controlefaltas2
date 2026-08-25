@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Controle de Faltas - UNIRIO (Site 2)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #fafafa; --text: #171717; --border: #e5e5e5;
+            --card: #ffffff; --gray: #d4d4d4; --green: #10b981;
+            --purple: #8b5cf6; --red: #ef4444;
+            --holiday-bg: #fef9c3; --holiday-text: #ca8a04;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        
+        body { background-color: var(--bg); color: var(--text); padding-top: 140px; padding-bottom: 80px; }
+        
+        .header-fixed {
+            position: fixed; top: 0; left: 0; width: 100%;
+            background: var(--bg); padding: 20px 20px 10px;
+            z-index: 100; border-bottom: 1px solid var(--border);
+        }
+
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        h1 { font-size: 20px; font-weight: 800; margin: 0; }
+        
+        #menu-btn { font-size: 28px; cursor: pointer; user-select: none; line-height: 1; padding-left: 10px; }
+
+        .dropdown-content {
+            display: none; position: absolute; right: 0; top: 100%; margin-top: 10px;
+            background: var(--card); box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-radius: 8px; border: 1px solid var(--border);
+            overflow: hidden; z-index: 200; min-width: 160px;
+        }
+        .dropdown-content.show { display: block; }
+        .dropdown-content div { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; font-weight: 600; cursor: pointer; color: var(--text); }
+        .dropdown-content div:last-child { border-bottom: none; }
+        .dropdown-content div:hover { background: var(--bg); }
+
+        .legend { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+        .page-content { display: none; }
+        .page-active { display: block; }
+
+        /* Lista View */
+        .day-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin: 0 20px 12px; }
+        .day-header { font-weight: 600; font-size: 14px; margin-bottom: 12px; text-transform: uppercase; }
+        .subject-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-top: 1px solid var(--border); }
+        .status-box { width: 36px; height: 36px; border-radius: 8px; background: var(--gray); display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; }
+        .state-1 { background: var(--green); } .state-2 { background: var(--purple); } .state-3 { background: var(--red); }
+
+        /* Calendário View */
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 0 20px 20px; text-align: center; font-size: 10px; }
+        .calendar-cell { border: 1px solid var(--border); border-radius: 6px; padding: 4px; min-height: 50px; background: var(--card); display: flex; flex-direction: column; align-items: center; }
+        .calendar-cell.holiday { background: var(--holiday-bg); border-color: var(--holiday-text); color: var(--holiday-text); font-weight: 800; }
+        .calendar-cell.inactive { background: transparent; border: none; }
+        .status-line { height: 4px; border-radius: 2px; width: 100%; margin-top: 2px; }
+
+        /* Planilha View */
+        .table-container { margin: 20px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 8px; font-size: 14px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--text); color: var(--card); }
+    </style>
+</head>
+<body>
+
+    <div class="header-fixed">
+        <div class="header-top">
+            <h1 id="titulo-app">Faltas UNIRIO 💅</h1>
+            <div style="position: relative;">
+                <div id="menu-btn" onclick="toggleMenu(event)">☰</div>
+                <div id="dropdown" class="dropdown-content">
+                    <div onclick="changeView(0)">Aulas do Dia</div>
+                    <div onclick="changeView(1)">Calendário</div>
+                    <div onclick="changeView(2)">Planilha</div>
+                </div>
+            </div>
+        </div>
+        <div class="legend">
+            <div class="legend-item"><div class="legend-dot" style="background: var(--green)"></div> Presente</div>
+            <div class="legend-item"><div class="legend-dot" style="background: var(--purple)"></div> Prof. faltou</div>
+            <div class="legend-item"><div class="legend-dot" style="background: var(--red)"></div> Faltei</div>
+        </div>
+    </div>
+
+    <!-- PÁGINAS -->
+    <div id="list-view" class="page-content page-active">
+        <div id="schedule-container"></div>
+    </div>
+
+    <div id="calendar-view" class="page-content">
+        <div id="calendar-container"></div>
+    </div>
+
+    <div id="planilha-view" class="page-content">
+        <h2 style="margin: 20px;">Planilha de Faltas</h2>
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Data</th><th>Matéria</th><th>Motivo</th></tr></thead>
+                <tbody id="absences-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. SISTEMA DE LOGIN COM SENHA (SITE 2)
+        // ==========================================
+        const senhasPermitidas = {
+            "12012007": "Maria Fernanda",
+            "06122006": "Ana Luisa",
+            "1404": "Julia"
+        };
+
+        let nomeUsuario = "";
+        
+        while (!nomeUsuario) {
+            let tentativa = prompt("🔒 Digite a sua senha de acesso:");
+            
+            if (tentativa === null) {
+                document.body.innerHTML = "<h2 style='text-align:center; margin-top: 100px;'>Acesso Negado. Recarregue a página.</h2>";
+                throw new Error("Usuário cancelou o login");
+            }
+            
+            if (senhasPermitidas[tentativa]) {
+                nomeUsuario = senhasPermitidas[tentativa];
+                document.getElementById('titulo-app').innerText = `Faltas - ${nomeUsuario} 💅`;
+            } else {
+                alert("❌ Senha incorreta! Tente novamente.");
+            }
+        }
+
+        // ==========================================
+        // 2. CONFIGURAÇÕES GERAIS E PLANILHA
+        // ==========================================
+        
+        // COLE AQUI A URL DO APPS SCRIPT DO SEU NOVO SITE (SITE 2)
+        const URL_DA_PLANILHA = "COLE_AQUI_A_URL_DO_APPS_SCRIPT_SITE_2";
+
+        const startDate = new Date(2026, 7, 17);
+        const endDate = new Date(2026, 11, 11);
+        const schedule = {
+            1: [{name: 'PI2', time: '16h'}, {name: 'PAA', time: '18h'}, {name: 'AGD', time: '20h'}],
+            2: [{name: 'ES1', time: '16h'}, {name: 'PROB', time: '18h'}, {name: 'CIBER', time: '20h'}],
+            3: [{name: 'PI2', time: '16h'}, {name: 'PAA', time: '18h'}, {name: 'AGD', time: '20h'}],
+            4: [{name: 'ES1', time: '16h'}, {name: 'PROB', time: '18h'}, {name: 'CIBER', time: '20h'}],
+            5: [{name: 'RC', time: '18h-22h'}]
+        };
+        const holidays = {'2026-09-07': 'Independência', '2026-10-12': 'N. Sra. Aparecida', '2026-11-02': 'Finados'};
+
+        let attendance = JSON.parse(localStorage.getItem(`unirio_site2_attendance_${nomeUsuario}`)) || {};
+        let absences = JSON.parse(localStorage.getItem(`unirio_site2_absences_${nomeUsuario}`)) || [];
+        
+        const views = ['list-view', 'calendar-view', 'planilha-view'];
+        let currentViewIdx = 0;
+
+        function toISOLocal(d) {
+            const z = n => ('0' + n).slice(-2);
+            return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`;
+        }
+
+        function toggleMenu(event) {
+            event.stopPropagation();
+            document.getElementById("dropdown").classList.toggle("show");
+        }
+
+        function changeView(idx) {
+            document.getElementById(views[currentViewIdx]).classList.remove('page-active');
+            currentViewIdx = idx;
+            document.getElementById(views[currentViewIdx]).classList.add('page-active');
+            document.getElementById("dropdown").classList.remove("show");
+            
+            if (idx === 1) renderCalendar();
+            if (idx === 2) renderAbsences();
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.matches('#menu-btn')) {
+                let dropdowns = document.getElementsByClassName("dropdown-content");
+                for (let i = 0; i < dropdowns.length; i++) {
+                    if (dropdowns[i].classList.contains('show')) dropdowns[i].classList.remove('show');
+                }
+            }
+        }
+
+        // ==========================================
+        // 3. COMUNICAÇÃO COM O GOOGLE
+        // ==========================================
+
+        function sincronizarComPlanilha() {
+            const titulo = document.getElementById('titulo-app');
+            titulo.innerHTML = `Faltas - ${nomeUsuario} 💅 <span style="font-size: 10px; color: gray;">(Salvando...)</span>`;
+
+            fetch(URL_DA_PLANILHA, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ usuario: nomeUsuario, attendance: attendance, absences: absences })
+            })
+            .then(res => res.json())
+            .then(data => {
+                titulo.innerHTML = `Faltas - ${nomeUsuario} 💅`;
+            })
+            .catch(error => {
+                titulo.innerHTML = `Faltas - ${nomeUsuario} 💅 <span style="font-size: 10px; color: red;">(Erro)</span>`;
+            });
+        }
+
+        async function carregarDadosDaPlanilha() {
+            try {
+                const response = await fetch(`${URL_DA_PLANILHA}?usuario=${encodeURIComponent(nomeUsuario)}`);
+                const data = await response.json();
+                
+                if(data && Object.keys(data.attendance || {}).length > 0) {
+                    attendance = data.attendance;
+                    absences = data.absences;
+                    
+                    localStorage.setItem(`unirio_site2_attendance_${nomeUsuario}`, JSON.stringify(attendance));
+                    localStorage.setItem(`unirio_site2_absences_${nomeUsuario}`, JSON.stringify(absences));
+                    
+                    renderApp();
+                    if (currentViewIdx === 1) renderCalendar();
+                    if (currentViewIdx === 2) renderAbsences();
+                }
+            } catch (error) {
+                console.error("Não foi possível puxar da nuvem, usando dados offline.", error);
+            }
+        }
+
+        // ==========================================
+        // 4. LÓGICA E RENDERIZAÇÃO
+        // ==========================================
+
+        function toggleState(id, subjectName, dateStr) {
+            let currentState = attendance[id] || 0;
+            let newState = (currentState + 1) % 4;
+            absences = absences.filter(a => a.id !== id);
+            
+            if (newState === 3) {
+                let reason = prompt(`Faltou em ${subjectName} por quê?`);
+                if (reason === null) newState = 0;
+                else absences.push({ id, date: dateStr, subject: subjectName, reason: reason || "Sem motivo" });
+            }
+            
+            attendance[id] = newState;
+            
+            localStorage.setItem(`unirio_site2_attendance_${nomeUsuario}`, JSON.stringify(attendance));
+            localStorage.setItem(`unirio_site2_absences_${nomeUsuario}`, JSON.stringify(absences));
+            
+            renderApp();
+            if (currentViewIdx === 1) renderCalendar();
+            if (currentViewIdx === 2) renderAbsences();
+
+            sincronizarComPlanilha();
+        }
+
+        function renderApp() {
+            const container = document.getElementById('schedule-container');
+            container.innerHTML = '';
+            let current = new Date(startDate);
+            while (current <= endDate) {
+                let d = toISOLocal(current);
+                if (current.getDay() >= 1 && current.getDay() <= 5) {
+                    let card = document.createElement('div');
+                    card.className = 'day-card';
+                    card.id = `day-${d}`;
+                    let html = `<div class="day-header">${d.split('-')[2]}/${d.split('-')[1]}</div>`;
+                    if(holidays[d]) html += `<p>🎉 ${holidays[d]}</p>`;
+                    else schedule[current.getDay()].forEach(sub => {
+                        let id = `${d}-${sub.name}`, state = attendance[id] || 0;
+                        html += `<div class="subject-row"><span>${sub.name} (${sub.time})</span><div class="status-box state-${state}" onclick="toggleState('${id}','${sub.name}','${d}')">${state==1?'✓':state==2?'P':state==3?'✕':''}</div></div>`;
+                    });
+                    card.innerHTML = html;
+                    container.appendChild(card);
+                }
+                current.setDate(current.getDate() + 1);
+            }
+        }
+
+        function renderCalendar() {
+            const container = document.getElementById('calendar-container');
+            container.innerHTML = '';
+            const daysOfWeek = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+
+            for (let m = 7; m <= 11; m++) {
+                let monthDate = new Date(2026, m, 1);
+                let html = `<h3 style="margin:20px; text-align:center;">${monthDate.toLocaleString('pt-BR',{month:'long'}).toUpperCase()}</h3><div class="calendar-grid">`;
+                
+                daysOfWeek.forEach(day => html += `<div style="font-weight:bold; color:#737373; padding-bottom:5px;">${day}</div>`);
+
+                let firstDay = monthDate.getDay();
+                let lastDate = new Date(2026, m + 1, 0).getDate();
+
+                for(let i = 0; i < firstDay; i++) {
+                    html += `<div class="calendar-cell inactive"></div>`;
+                }
+
+                for(let d = 1; d <= lastDate; d++) {
+                    let date = new Date(2026, m, d), dStr = toISOLocal(date);
+                    let isHoliday = holidays[dStr];
+                    let cellClass = `calendar-cell ${isHoliday ? 'holiday' : ''}`;
+                    
+                    html += `<div class="${cellClass}">${d}`;
+                    
+                    if(date >= startDate && date <= endDate && date.getDay() >= 1 && date.getDay() <= 5 && !isHoliday) {
+                        html += `<div style="display:flex; flex-direction:column; width:100%; margin-top:2px;">`;
+                        schedule[date.getDay()].forEach(sub => {
+                            let state = attendance[`${dStr}-${sub.name}`] || 0;
+                            let color = state==1?'var(--green)':state==2?'var(--purple)':state==3?'var(--red)':'var(--gray)';
+                            html += `<div class="status-line" style="background:${color}"></div>`;
+                        });
+                        html += `</div>`;
+                    }
+                    html += `</div>`;
+                }
+                container.innerHTML += html + `</div>`;
+            }
+        }
+
+        function renderAbsences() {
+            const tbody = document.getElementById('absences-body');
+            tbody.innerHTML = absences.length ? '' : `<tr><td colspan="3" style="text-align:center">Nenhuma falta! ✨</td></tr>`;
+            absences.sort((a,b)=>a.date.localeCompare(b.date)).forEach(ab => tbody.innerHTML += `<tr><td>${ab.date.split('-')[2]}/${ab.date.split('-')[1]}</td><td>${ab.subject}</td><td>${ab.reason}</td></tr>`);
+        }
+
+        renderApp();
+        carregarDadosDaPlanilha();
+
+        const todayStr = toISOLocal(new Date());
+        const todayEl = document.getElementById(`day-${todayStr}`);
+        if(todayEl) {
+            setTimeout(() => { todayEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 500);
+        }
+    </script>
+</body>
+</html>
