@@ -109,12 +109,14 @@
 
     <script>
         // ==========================================
-        // 1. SISTEMA DE LOGIN COM SENHA (SITE 2)
+        // 1. SISTEMA DE LOGIN COM SENHA
         // ==========================================
         const senhasPermitidas = {
             "12012007": "Maria Fernanda",
             "06122006": "Ana Luisa",
-            "1404": "Julia"
+            "1404": "Julia",
+            "01092005": "Ana Carolina",
+            "31032004": "Ana Morone"
         };
 
         let nomeUsuario = "";
@@ -136,21 +138,47 @@
         }
 
         // ==========================================
-        // 2. CONFIGURAÇÕES GERAIS E PLANILHA
+        // 2. CONFIGURAÇÕES GERAIS E HORÁRIOS
         // ==========================================
         
-        // COLE AQUI A URL DO APPS SCRIPT DO SEU NOVO SITE (SITE 2)
-        const URL_DA_PLANILHA = "https://script.google.com/macros/s/AKfycbyY4TgvEtQcmFIcLbsln2bHBs44AFfpSPYLK4OTLxHy_2h0MJvDBQeSbun7xRzBdnvCOg/exec";
+        const URL_DA_PLANILHA = "COLE_AQUI_A_URL_DO_APPS_SCRIPT_SITE_2";
 
         const startDate = new Date(2026, 7, 17);
         const endDate = new Date(2026, 11, 11);
-        const schedule = {
+
+        // Grade de Horários padrão
+        const defaultSchedule = {
             1: [{name: 'PI2', time: '16h'}, {name: 'PAA', time: '18h'}, {name: 'AGD', time: '20h'}],
             2: [{name: 'ES1', time: '16h'}, {name: 'PROB', time: '18h'}, {name: 'CIBER', time: '20h'}],
             3: [{name: 'PI2', time: '16h'}, {name: 'PAA', time: '18h'}, {name: 'AGD', time: '20h'}],
             4: [{name: 'ES1', time: '16h'}, {name: 'PROB', time: '18h'}, {name: 'CIBER', time: '20h'}],
             5: [{name: 'RC', time: '18h-22h'}]
         };
+
+        // Grade de Horários da Ana Carolina
+        const anaCarolinaSchedule = {
+            1: [{name: 'MDI', time: '14h'}, {name: 'APS', time: '16h'}],
+            2: [{name: 'LPP', time: '16h'}, {name: 'ED', time: '18h'}],
+            3: [{name: 'MDI', time: '14h'}, {name: 'APS', time: '16h'}],
+            4: [{name: 'LPP', time: '16h'}, {name: 'ED', time: '18h'}],
+            5: []
+        };
+
+        // Grade de Horários da Ana Morone
+        const anaMoroneSchedule = {
+            1: [{name: 'MDI', time: '14h'}, {name: 'APS', time: '16h'}, {name: 'CALC 2', time: '18h'}],
+            2: [],
+            3: [{name: 'MDI', time: '14h'}, {name: 'APS', time: '16h'}, {name: 'CALC 2', time: '18h'}],
+            4: [],
+            5: []
+        };
+
+        const userSchedules = {
+            "Ana Carolina": anaCarolinaSchedule,
+            "Ana Morone": anaMoroneSchedule
+        };
+
+        const schedule = userSchedules[nomeUsuario] || defaultSchedule;
         const holidays = {'2026-09-07': 'Independência', '2026-10-12': 'N. Sra. Aparecida', '2026-11-02': 'Finados'};
 
         let attendance = JSON.parse(localStorage.getItem(`unirio_site2_attendance_${nomeUsuario}`)) || {};
@@ -265,12 +293,17 @@
             while (current <= endDate) {
                 let d = toISOLocal(current);
                 if (current.getDay() >= 1 && current.getDay() <= 5) {
+                    let daySubjects = schedule[current.getDay()] || [];
+                    if (daySubjects.length === 0 && !holidays[d]) {
+                        current.setDate(current.getDate() + 1);
+                        continue;
+                    }
                     let card = document.createElement('div');
                     card.className = 'day-card';
                     card.id = `day-${d}`;
                     let html = `<div class="day-header">${d.split('-')[2]}/${d.split('-')[1]}</div>`;
                     if(holidays[d]) html += `<p>🎉 ${holidays[d]}</p>`;
-                    else schedule[current.getDay()].forEach(sub => {
+                    else daySubjects.forEach(sub => {
                         let id = `${d}-${sub.name}`, state = attendance[id] || 0;
                         html += `<div class="subject-row"><span>${sub.name} (${sub.time})</span><div class="status-box state-${state}" onclick="toggleState('${id}','${sub.name}','${d}')">${state==1?'✓':state==2?'P':state==3?'✕':''}</div></div>`;
                     });
@@ -307,13 +340,16 @@
                     html += `<div class="${cellClass}">${d}`;
                     
                     if(date >= startDate && date <= endDate && date.getDay() >= 1 && date.getDay() <= 5 && !isHoliday) {
-                        html += `<div style="display:flex; flex-direction:column; width:100%; margin-top:2px;">`;
-                        schedule[date.getDay()].forEach(sub => {
-                            let state = attendance[`${dStr}-${sub.name}`] || 0;
-                            let color = state==1?'var(--green)':state==2?'var(--purple)':state==3?'var(--red)':'var(--gray)';
-                            html += `<div class="status-line" style="background:${color}"></div>`;
-                        });
-                        html += `</div>`;
+                        let daySubjects = schedule[date.getDay()] || [];
+                        if (daySubjects.length > 0) {
+                            html += `<div style="display:flex; flex-direction:column; width:100%; margin-top:2px;">`;
+                            daySubjects.forEach(sub => {
+                                let state = attendance[`${dStr}-${sub.name}`] || 0;
+                                let color = state==1?'var(--green)':state==2?'var(--purple)':state==3?'var(--red)':'var(--gray)';
+                                html += `<div class="status-line" style="background:${color}"></div>`;
+                            });
+                            html += `</div>`;
+                        }
                     }
                     html += `</div>`;
                 }
